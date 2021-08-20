@@ -238,6 +238,7 @@ class DDFUpPack(nn.Module):
         self.dilation = dilation
         self.head = head
         self.kernel_combine = kernel_combine
+        self.scale_factor = scale_factor
 
         self.spatial_branch = nn.ModuleList()
         self.channel_branch = nn.ModuleList()
@@ -247,7 +248,7 @@ class DDFUpPack(nn.Module):
         else:
             joint_channels = in_channels
 
-        for i in range(scale_factor ** 2):
+        for i in range(self.scale_factor ** 2):
             # build spatial branches
             self.spatial_branch.append(
                 build_spatial_branch(
@@ -266,9 +267,9 @@ class DDFUpPack(nn.Module):
         _x = x.reshape(b*g, c//g, h, w)
         for s_b, c_b in zip(self.spatial_branch, self.channel_branch):
             channel_filter = c_b(x).reshape(b*g, c//g, k, k)
-            spatial_filter = s_b(joint_x).reshape(b*g, c//g, h, w)
+            spatial_filter = s_b(joint_x).reshape(b*g, -1, h, w)
             o = ddf(_x, channel_filter, spatial_filter,
-                    self.kernel_size, self.dilation, 1, self.head, self.kernel_combine).type_as(x)
+                    self.kernel_size, self.dilation, 1,  self.kernel_combine).type_as(x)
             outs.append(o.reshape(b, c, h, w))
         out = torch.stack(outs, dim=2)
         out = out.reshape(out.size(0), -1, out.size(-2), out.size(-1))
